@@ -14,137 +14,137 @@ type SliderProps = {
 
 export default function Slider({ slides, interval = 5000 }: SliderProps) {
   const [current, setCurrent] = useState(0)
-  const [isFlipping, setIsFlipping] = useState(false)
-  const [direction, setDirection] = useState<'next' | 'prev'>('next')
+  const [next, setNext] = useState(0)
+  const [isAnimating, setIsAnimating] = useState(false)
 
-  const goTo = useCallback((index: number, dir: 'next' | 'prev') => {
-    if (isFlipping) return
-    setDirection(dir)
-    setIsFlipping(true)
-    setTimeout(() => {
-      setCurrent(index)
-      setTimeout(() => setIsFlipping(false), 700)
-    }, 50)
-  }, [isFlipping])
+  const goTo = useCallback((index: number) => {
+    if (isAnimating || index === current) return
+    setNext(index)
+    setIsAnimating(true)
+  }, [isAnimating, current])
 
-  const prev = useCallback(() => {
-    const nextIndex = current === 0 ? slides.length - 1 : current - 1
-    goTo(nextIndex, 'prev')
+  const goNext = useCallback(() => {
+    goTo((current + 1) % slides.length)
   }, [current, slides.length, goTo])
 
-  const next = useCallback(() => {
-    const nextIndex = current === slides.length - 1 ? 0 : current + 1
-    goTo(nextIndex, 'next')
+  const goPrev = useCallback(() => {
+    goTo((current - 1 + slides.length) % slides.length)
   }, [current, slides.length, goTo])
 
   useEffect(() => {
-    const timer = setInterval(next, interval)
+    const timer = setInterval(goNext, interval)
     return () => clearInterval(timer)
-  }, [next, interval])
-
-  const getSlideStyle = (index: number): React.CSSProperties => {
-    if (index === current && !isFlipping) {
-      return {
-        opacity: 1,
-        transform: 'perspective(1200px) rotateY(0deg) scale(1)',
-        zIndex: 2,
-      }
-    }
-    if (index === current && isFlipping) {
-      return {
-        opacity: 0,
-        transform: direction === 'next'
-          ? 'perspective(1200px) rotateY(-90deg) scale(0.8)'
-          : 'perspective(1200px) rotateY(90deg) scale(0.8)',
-        zIndex: 1,
-        transition: 'all 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
-      }
-    }
-    if (index !== current && isFlipping) {
-      const isActive = (
-        direction === 'next' && index === (current + 1) % slides.length
-      ) || (
-        direction === 'prev' && index === (current - 1 + slides.length) % slides.length
-      )
-      if (isActive) {
-        return {
-          opacity: 1,
-          transform: direction === 'next'
-            ? 'perspective(1200px) rotateY(90deg) scale(0.8)'
-            : 'perspective(1200px) rotateY(-90deg) scale(0.8)',
-          zIndex: 3,
-          transition: 'none',
-        }
-      }
-    }
-    return {
-      opacity: 0,
-      transform: 'perspective(1200px) rotateY(0deg) scale(0.9)',
-      zIndex: 0,
-    }
-  }
-
-  const [displayedCurrent, setDisplayedCurrent] = useState(current)
+  }, [goNext, interval])
 
   useEffect(() => {
-    setDisplayedCurrent(current)
-  }, [current])
+    if (!isAnimating) return
+    const timer = setTimeout(() => {
+      setCurrent(next)
+      setIsAnimating(false)
+    }, 1200)
+    return () => clearTimeout(timer)
+  }, [isAnimating, next])
 
   return (
-    <div className="relative w-full h-screen overflow-hidden" style={{ perspective: '1200px' }}>
-      <div className="relative w-full h-full">
-        {slides.map((slide, index) => {
-          const style = getSlideStyle(index)
-          return (
+    <div className="relative w-full h-screen overflow-hidden bg-black">
+      {slides.map((slide, index) => {
+        const isActive = index === current
+        const isNext = index === next && isAnimating
+
+        return (
+          <div
+            key={slide.id}
+            className="absolute inset-0"
+            style={{
+              opacity: isActive ? (isAnimating ? 0 : 1) : isNext ? 1 : 0,
+              transition: isActive
+                ? 'opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                : isNext
+                  ? 'opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                  : 'none',
+              zIndex: isNext ? 2 : isActive ? 1 : 0,
+            }}
+          >
             <div
-              key={slide.id}
-              className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br ${slide.bg}`}
+              className={`absolute inset-0 bg-gradient-to-br ${slide.bg}`}
               style={{
-                ...style,
                 backgroundImage: slide.image
-                  ? `linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${slide.image})`
+                  ? `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${slide.image})`
                   : undefined,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                backfaceVisibility: 'hidden',
+                transform: isActive && !isAnimating
+                  ? 'scale(1)'
+                  : isNext
+                    ? 'scale(1.08)'
+                    : 'scale(1)',
+                transition: 'transform 8s cubic-bezier(0.25, 0.1, 0.25, 1)',
               }}
-            >
-              <h2 className="text-white text-4xl md:text-7xl font-thin tracking-tight select-none drop-shadow-2xl">
+            />
+
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+
+            <div className="absolute inset-0 flex items-center justify-center">
+              <h2
+                className="text-white text-4xl md:text-7xl lg:text-8xl font-light tracking-tight select-none text-center px-8"
+                style={{
+                  textShadow: '0 2px 40px rgba(0,0,0,0.5)',
+                  opacity: isActive ? (isAnimating ? 0 : 1) : isNext ? 1 : 0,
+                  transform: isActive && !isAnimating
+                    ? 'translateY(0)'
+                    : isNext
+                      ? 'translateY(20px)'
+                      : 'translateY(20px)',
+                  transition: isActive
+                    ? 'all 1s cubic-bezier(0.4, 0, 0.2, 1) 0.3s'
+                    : isNext
+                      ? 'all 1s cubic-bezier(0.4, 0, 0.2, 1) 0.4s'
+                      : 'none',
+                }}
+              >
                 {slide.title}
               </h2>
             </div>
-          )
-        })}
-      </div>
+          </div>
+        )
+      })}
 
       <button
-        onClick={prev}
-        className="absolute left-4 top-1/2 -translate-y-1/2 size-14 flex items-center justify-center rounded-full bg-white/20 text-white text-3xl hover:bg-white/30 backdrop-blur-sm transition-all hover:scale-110 cursor-pointer z-10"
+        onClick={goPrev}
+        className="absolute left-6 top-1/2 -translate-y-1/2 size-12 flex items-center justify-center rounded-full bg-white/10 text-white text-xl hover:bg-white/20 backdrop-blur-md transition-all duration-300 cursor-pointer z-10 border border-white/10 hover:border-white/20"
         aria-label="Previous slide"
       >
-        &#8249;
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M15 19l-7-7 7-7" />
+        </svg>
       </button>
 
       <button
-        onClick={next}
-        className="absolute right-4 top-1/2 -translate-y-1/2 size-14 flex items-center justify-center rounded-full bg-white/20 text-white text-3xl hover:bg-white/30 backdrop-blur-sm transition-all hover:scale-110 cursor-pointer z-10"
+        onClick={goNext}
+        className="absolute right-6 top-1/2 -translate-y-1/2 size-12 flex items-center justify-center rounded-full bg-white/10 text-white text-xl hover:bg-white/20 backdrop-blur-md transition-all duration-300 cursor-pointer z-10 border border-white/10 hover:border-white/20"
         aria-label="Next slide"
       >
-        &#8250;
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M9 5l7 7-7 7" />
+        </svg>
       </button>
 
-      <div className="absolute bottom-8 inset-x-0 flex justify-center gap-3 z-10">
+      <div className="absolute bottom-10 inset-x-0 flex justify-center gap-2 z-10">
         {slides.map((_, index) => (
           <button
             key={index}
-            onClick={() => goTo(index, index > current ? 'next' : 'prev')}
-            className={`h-3 rounded-full transition-all cursor-pointer ${
-              index === displayedCurrent ? 'bg-white w-8 shadow-lg shadow-white/30' : 'bg-white/40 w-3 hover:bg-white/60'
+            onClick={() => goTo(index)}
+            className={`rounded-full transition-all duration-500 cursor-pointer ${
+              index === current
+                ? 'bg-white w-8 h-2'
+                : 'bg-white/30 w-2 h-2 hover:bg-white/50'
             }`}
             aria-label={`Go to slide ${index + 1}`}
           />
         ))}
       </div>
+
+      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent z-10" />
     </div>
   )
 }
